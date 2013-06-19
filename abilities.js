@@ -29,7 +29,7 @@ Parse.Cloud.define('updateAbilities', function(request, response) {
 
 function fetchAndUpdateAbilitiesFromWikiaForChampions(champions, abilities, wikiaCookie) {
 	//var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&generator=categorymembers&gcmtitle=Category:Released_champion&gcmlimit=max';
-	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&titles=Nidalee|Quinn'; // Temporary since titles has a limit of 50!!!
+	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&titles=Nidalee'; // Temporary since titles has a limit of 50!!!
 	console.log('URL for ability fetch: ' + wikiaURL);
 
 	return Parse.Cloud.httpRequest({ url: wikiaURL, headers: { 'Cookie' : wikiaCookie } }).then(function(httpResponse) {
@@ -90,6 +90,7 @@ function fetchAndUpdateAbilitiesFromWikiaForChampions(champions, abilities, wiki
 function parseAbilityDataStringForChampion(dataString, champion) {
 	var Ability = Parse.Object.extend('Ability');
 	var statsToParse = getArrayOfStatsToUpdate();
+	var binding = /\|([PQWER])/.exec(dataString)[1];
 	var abilities = [];
 
 	if (abilityDataStringHoldsMultipleAbilities(dataString)) {
@@ -97,15 +98,20 @@ function parseAbilityDataStringForChampion(dataString, champion) {
 		var startIndexOfAbility1 = multipleAbilitiesPattern.exec(dataString).index;
 		var startIndexOfAbility2 = multipleAbilitiesPattern.exec(dataString).index;
 
-		if (champion.get('name') == 'Nidalee') console.log('index1: ' + startIndexOfAbility1 + ', index2: ' + startIndexOfAbility2);
+		if (champion.get('name') == 'Nidalee') console.log(	'\n\nindex1: ' + startIndexOfAbility1 + ', index2: ' + startIndexOfAbility2 +
+															'\ndataString: ' + dataString +
+															'\n\n');
 
 		var ability1 = new Ability();
 		var ability2 = new Ability();
+		
 
 		ability1.set('rawData', dataString);
-		ability1.set('binding', /\|([PQWER])/.exec(dataString)[1]);
+		ability1.set('binding', binding);
+		ability1.set('primary', true);
 		ability2.set('rawData', dataString.substring(startIndexOfAbility2, dataString.length-1));
-		ability2.set('binding', /\|([PQWER])/.exec(dataString)[1]);
+		ability2.set('binding', binding);
+		ability2.set('primary', false);
 
 		for (var i=0; i<statsToParse.length; i++) {
 			setStatUsingDataStringAndAbility(statsToParse[i], dataString.substring(startIndexOfAbility1, startIndexOfAbility2-1), ability1);
@@ -118,6 +124,8 @@ function parseAbilityDataStringForChampion(dataString, champion) {
 		var ability = new Ability();
 
 		ability.set('rawData', dataString);
+		ability.set('primary', true);
+		ability.set('binding', binding);
 
 		for (var i=0; i<statsToParse.length; i++) {
 			setStatUsingDataStringAndAbility(statsToParse[i], dataString, ability);
@@ -175,7 +183,7 @@ function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 }
 
 function getArrayOfStatsToUpdate() {
-	var statsToUpdate = ['binding','name','imageName'];// ,'description'];
+	var statsToUpdate = ['name','imageName'];// 'binding','description'];
 
 	return statsToUpdate;
 }
