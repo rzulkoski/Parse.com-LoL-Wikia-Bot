@@ -1,14 +1,6 @@
 
 var toolbox = require('cloud/parse_toolbox.js');
-var credentials = require('cloud/wikia_credentials.js');
-
-function indexOfMatchInParseArrayForStringOnField(array, string, field) {
-	var indexOfMatch = -1;
-	for (var i = 0; i < array.length; i++) {
-		if (array[i].get(field) == string) indexOfMatch = i;
-	}
-	return indexOfMatch;
-}
+var wikia   = require('cloud/wikia.js');
 
 Parse.Cloud.define('updateAbilities', function(request, response) {
 	var championsQuery = new Parse.Query('Champion');
@@ -16,10 +8,10 @@ Parse.Cloud.define('updateAbilities', function(request, response) {
 	championsQuery.limit(200);
 	abilitiesQuery.limit(1000);
 
-	Parse.Promise.when([championsQuery.find(), abilitiesQuery.find(), logInToWikia()]).then(function(championsResult, abilitiesResult, wikiaCookie) {
+	Parse.Promise.when([championsQuery.find(), abilitiesQuery.find(), wikia.login()]).then(function(championsResult, abilitiesResult, wikiaCookie) {
 		return fetchAndUpdateAbilitiesFromWikiaForChampions(championsResult, abilitiesResult, wikiaCookie);
 	}).then(function(results) {
-		return Parse.Promise.as('YOU WIN');  // results[0].get('name'));
+		return Parse.Promise.as('Abilities updated');  // results[0].get('name'));
 	}).then(function(champ) {
 		response.success('Success! ' + champ);
 	}, function(error) {
@@ -28,49 +20,33 @@ Parse.Cloud.define('updateAbilities', function(request, response) {
 });
 
 function fetchAndUpdateAbilitiesFromWikiaForChampions(champions, abilities, wikiaCookie) {
-	//var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&generator=categorymembers&gcmtitle=Category:Released_champion&gcmlimit=max';
-	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&titles=Nidalee'; // Temporary since titles has a limit of 50!!!
+	//var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&generator=categorymembers&gcmtitle=Category:Released_champion&gcmlimit=max&export';
+	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&titles=Nidalee|Quinn'; // Temporary since titles has a limit of 50!!!
 	console.log('URL for ability fetch: ' + wikiaURL);
 
 	return Parse.Cloud.httpRequest({ url: wikiaURL, headers: { 'Cookie' : wikiaCookie } }).then(function(httpResponse) {
 		console.log('About to show response');
-		console.log('Response: ' + httpResponse.text.substring(0,1000));
+		console.log('Response: ' + httpResponse.text.substring(0, 1000));
 		var json = JSON.parse(httpResponse.text);
 
-		var abilitiesToSave = [];
 		var i=0;
 		for (var page in json.query.pages) {
 			var abilityChampName = JSON.stringify(json.query.pages[page].title).replace(/"/g, '');
 			var abilitiesPattern = /== *Abilities *==[\s\\n]+([^\[]+)== *References *==/
-			var pPattern = /\{\{[Aa]bility[\w\s\\]*(\|P[^\[]+)\{\{[Aa]bility[\w\s\\]*\|Q/
-			var qPattern = /\{\{[Aa]bility[\w\s\\]*(\|Q[^\[]+)\{\{[Aa]bility[\w\s\\]*\|W/
-			var wPattern = /\{\{[Aa]bility[\w\s\\]*(\|W[^\[]+)\{\{[Aa]bility[\w\s\\]*\|E/
-			var ePattern = /\{\{[Aa]bility[\w\s\\]*(\|E[^\[]+)\{\{[Aa]bility[\w\s\\]*\|R/
-			var rPattern = /\{\{[Aa]bility[\w\s\\]*(\|R[^\[]+)/
 			
 			var abilityDataString = abilitiesPattern.exec(JSON.stringify(json.query.pages[page].revisions))[1];
 
 			var champIndex = toolbox.indexOfMatchInParseArrayForStringOnField(champions, abilityChampName, 'name');
 
 			if (i < 2) {
-				abilitiesToSave = abilitiesToSave.concat(parseAbilityDataStringForChampion(pPattern.exec(abilityDataString)[1], champions[champIndex]));
-				abilitiesToSave = abilitiesToSave.concat(parseAbilityDataStringForChampion(qPattern.exec(abilityDataString)[1], champions[champIndex]));
-				abilitiesToSave = abilitiesToSave.concat(parseAbilityDataStringForChampion(wPattern.exec(abilityDataString)[1], champions[champIndex]));
-				abilitiesToSave = abilitiesToSave.concat(parseAbilityDataStringForChampion(ePattern.exec(abilityDataString)[1], champions[champIndex]));
-				abilitiesToSave = abilitiesToSave.concat(parseAbilityDataStringForChampion(rPattern.exec(abilityDataString)[1], champions[champIndex]));
 
-				console.log('\n\n' +
-							'\nchampIndex: ' + champIndex +
-							'\nchampions.name: ' + champions[champIndex].get('name') +
-							'\nabilityDataString.name: ' + abilityChampName +
-							'\ndataString: ' + abilityDataString + '\n' + 
-							'\n\n');
+				console.log('Champ ObjectID: ' + champions[champIndex].id);
+				console.log('Ability Champion RefID: ' + abilities[0].get('champion').id);
+				if (abilities[0].get('champion').id == champions[champIndex].id) console.log('MATCHES!!!!');
 
-				console.log('Passive: ' + pPattern.exec(abilityDataString)[1]);
-				console.log('Q Ability: ' + qPattern.exec(abilityDataString)[1]);
-				console.log('W Ability: ' + wPattern.exec(abilityDataString)[1]);
-				console.log('E Ability: ' + ePattern.exec(abilityDataString)[1]);
-				console.log('R Ability: ' + rPattern.exec(abilityDataString)[1]);
+				var abilitiesForChampion = toolbox.matchingElementsInArrayForObjectRefOnField(abilities, champions[champIndex], 'champion');
+
+				abilities = abilities.concat(parseAbilityDataStringForChampionWithAbilities(abilityDataString, champions[champIndex], abilitiesForChampion));
 			}
 
 			i++;
@@ -78,7 +54,13 @@ function fetchAndUpdateAbilitiesFromWikiaForChampions(champions, abilities, wiki
 
 		console.log('count = ' + i);
 
-		return Parse.Object.saveAll(abilitiesToSave).then(function() {
+
+		// TEMP TEMP TEMP TEMP
+		//return ability.save();
+
+
+
+		return Parse.Object.saveAll(abilities).then(function() { // Save all abilities/champs
 			return Parse.Promise.as(champions);
 		})
 	}, function(error) {
@@ -87,54 +69,90 @@ function fetchAndUpdateAbilitiesFromWikiaForChampions(champions, abilities, wiki
 	});
 }
 
-function parseAbilityDataStringForChampion(dataString, champion) {
+function parseAbilityDataStringForChampionWithAbilities(dataString, champion, existingAbilities) {
 	var Ability = Parse.Object.extend('Ability');
+	var namePattern = /\|name \= ([^\\]+)\\n/
 	var statsToParse = getArrayOfStatsToUpdate();
-	var binding = /\|([PQWER])/.exec(dataString)[1];
-	var abilities = [];
+	var newAbilities = [];
 
-	if (abilityDataStringHoldsMultipleAbilities(dataString)) {
-		var multipleAbilitiesPattern = /[Aa]bility[\s]+info/g
-		var startIndexOfAbility1 = multipleAbilitiesPattern.exec(dataString).index;
-		var startIndexOfAbility2 = multipleAbilitiesPattern.exec(dataString).index;
+	var individualAbilityDataStrings = separateAbilityDataStringIntoIndividualAbilityDataStrings(dataString);
 
-		if (champion.get('name') == 'Nidalee') console.log(	'\n\nindex1: ' + startIndexOfAbility1 + ', index2: ' + startIndexOfAbility2 +
-															'\ndataString: ' + dataString +
-															'\n\n');
+	for (var i=0; i<individualAbilityDataStrings.length; i++) {
+		var binding = /\|([PQWER])/.exec(individualAbilityDataStrings[i])[1];
 
-		var ability1 = new Ability();
-		var ability2 = new Ability();
-		
+		if (abilityDataStringHoldsMultipleAbilities(individualAbilityDataStrings[i])) {
+			console.log(binding + ': Multiple');
+			var multipleAbilitiesPattern = /[Aa]bility[\s]+info/g
+			var startIndexOfAbility1 = multipleAbilitiesPattern.exec(individualAbilityDataStrings[i]).index;
+			var startIndexOfAbility2 = multipleAbilitiesPattern.exec(individualAbilityDataStrings[i]).index;
 
-		ability1.set('rawData', dataString);
-		ability1.set('binding', binding);
-		ability1.set('primary', true);
-		ability2.set('rawData', dataString.substring(startIndexOfAbility2, dataString.length-1));
-		ability2.set('binding', binding);
-		ability2.set('primary', false);
+			var ability1DataString = individualAbilityDataStrings[i].substring(startIndexOfAbility1, startIndexOfAbility2-1);
+			var ability2DataString = individualAbilityDataStrings[i].substring(startIndexOfAbility2, individualAbilityDataStrings[i].length-1);
 
-		for (var i=0; i<statsToParse.length; i++) {
-			setStatUsingDataStringAndAbility(statsToParse[i], dataString.substring(startIndexOfAbility1, startIndexOfAbility2-1), ability1);
-			setStatUsingDataStringAndAbility(statsToParse[i], dataString.substring(startIndexOfAbility2), ability2);
+			// Check if ability to be parsed is already known, if so prepare to update known ability else create new ability object and push onto newAbilities array.
+			var indexOfMatch = toolbox.indexOfMatchInParseArrayForStringOnField(existingAbilities, namePattern.exec(ability1DataString)[1], 'name');
+			if (indexOfMatch == -1) {
+				ability1 = new Ability();
+				newAbilities.push(ability1);
+			} else ability1 = existingAbilities[indexOfMatch];
+			indexOfMatch = toolbox.indexOfMatchInParseArrayForStringOnField(existingAbilities, namePattern.exec(ability2DataString)[1], 'name');
+			if (indexOfMatch == -1) {
+				ability2 = new Ability();
+				newAbilities.push(ability2);
+			} else ability2 = existingAbilities[indexOfMatch];
+			
+
+			ability1.set('champion', champion);
+			ability1.set('rawData', ability1DataString);
+			ability1.set('binding', binding);
+			ability1.set('primary', true);
+			ability2.set('champion', champion);
+			ability2.set('rawData', ability2DataString);
+			ability2.set('binding', binding);
+			ability2.set('primary', false);
+
+			for (var statIndex=0; statIndex<statsToParse.length; statIndex++) {
+				setStatUsingDataStringAndAbility(statsToParse[statIndex], ability1DataString, ability1);
+				setStatUsingDataStringAndAbility(statsToParse[statIndex], ability2DataString, ability2);
+			}
+		} else {
+			console.log(binding + ': Single');
+			var indexOfMatch = toolbox.indexOfMatchInParseArrayForStringOnField(existingAbilities, namePattern.exec(individualAbilityDataStrings[i])[1], 'name');
+			if (indexOfMatch == -1) {
+				ability = new Ability();
+				newAbilities.push(ability);
+			} else ability = existingAbilities[indexOfMatch];
+
+			ability.set('champion', champion);
+			ability.set('rawData', individualAbilityDataStrings[i]);
+			ability.set('primary', true);
+			ability.set('binding', binding);
+
+			for (var statIndex=0; statIndex<statsToParse.length; statIndex++) {
+				setStatUsingDataStringAndAbility(statsToParse[statIndex], individualAbilityDataStrings[i], ability);
+			}
 		}
-
-		abilities.push(ability1);
-		abilities.push(ability2);
-	} else {
-		var ability = new Ability();
-
-		ability.set('rawData', dataString);
-		ability.set('primary', true);
-		ability.set('binding', binding);
-
-		for (var i=0; i<statsToParse.length; i++) {
-			setStatUsingDataStringAndAbility(statsToParse[i], dataString, ability);
-		}
-
-		abilities.push(ability);
 	}
 
-	return abilities;
+	return newAbilities; // Only need to return NEW ability objects
+}
+
+function separateAbilityDataStringIntoIndividualAbilityDataStrings(dataString) {
+	var pPattern = /\{\{[Aa]bility[\w\s\\]*(\|P[^\[]+)\{\{[Aa]bility[\w\s\\]*\|Q/
+	var qPattern = /\{\{[Aa]bility[\w\s\\]*(\|Q[^\[]+)\{\{[Aa]bility[\w\s\\]*\|W/
+	var wPattern = /\{\{[Aa]bility[\w\s\\]*(\|W[^\[]+)\{\{[Aa]bility[\w\s\\]*\|E/
+	var ePattern = /\{\{[Aa]bility[\w\s\\]*(\|E[^\[]+)\{\{[Aa]bility[\w\s\\]*\|R/
+	var rPattern = /\{\{[Aa]bility[\w\s\\]*(\|R[^\[]+)/
+
+	var individualAbilityDataStrings = [];
+
+	individualAbilityDataStrings.push(pPattern.exec(dataString)[1]);
+	individualAbilityDataStrings.push(qPattern.exec(dataString)[1]);
+	individualAbilityDataStrings.push(wPattern.exec(dataString)[1]);
+	individualAbilityDataStrings.push(ePattern.exec(dataString)[1]);
+	individualAbilityDataStrings.push(rPattern.exec(dataString)[1]);
+	
+	return individualAbilityDataStrings;
 }
 
 function abilityDataStringHoldsMultipleAbilities(dataString) {
@@ -186,64 +204,6 @@ function getArrayOfStatsToUpdate() {
 	var statsToUpdate = ['name','imageName'];// 'binding','description'];
 
 	return statsToUpdate;
-}
-
-// Returns a cookie after successful login
-function logInToWikia() {
-	console.log('Login: ' + credentials.loginName() + ', Password: ' + credentials.password());
-	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=login&lgname=' + credentials.loginName() + '&lgpassword=' + credentials.password() + '&format=json';
-	var cookie;
-	var sessionID;
-	var loginDomain;
-	var confirmToken;
-	var cookiePrefix;
-
-	return Parse.Cloud.httpRequest({ method: "POST", url: wikiaURL }).then(function(httpResponse) {
-		console.log(httpResponse.text);
-		json = JSON.parse(httpResponse.text);
-
-		cookiePrefix = json.login.cookieprefix;
-		var loginToken = json.login.token;
-		var result = json.login.result;
-
-		cookie = httpResponse.headers['Set-Cookie'];
-		sessionID = /session=([\w]+);/.exec(cookie)[1];
-
-		var loginDomain = /domain=([\.\w]+);/.exec(cookie)[1];
-
-		confirmToken = cookiePrefix + '_session=' + sessionID;
-
-		for (var header in httpResponse.headers) {
-			console.log('Headers: ' + header + ': ' + httpResponse.headers[header]);
-		}
-
-		console.log('\n\n' +
-					'\n==============================' +
-					'\nInitial login response: ' + result +
-					'\nCookie prefix: ' + cookiePrefix +
-				    '\nCookie Received: ' + cookie +
-				    '\nSessionID: ' + sessionID +
-				    '\nLogin token: ' + loginToken +
-				    '\n==============================\n\n');
-
-		return Parse.Promise.as(loginToken);
-	}).then(function(loginToken) {
-		return Parse.Cloud.httpRequest({ method: "POST", url: wikiaURL + '&lgtoken=' + loginToken + '&cookieprefix=' + cookiePrefix + '&sessionid=' + sessionID, headers: { 'Cookie' : cookie } }).then(function (loginResponse) {
-			var json = JSON.parse(loginResponse.text);
-			var finalCookie = loginResponse.headers['Set-Cookie'];
-			var result = json.login.result;
-			console.log('\n' +
-						'\n==============================' +
-						'\nFinal login response: ' + result +
-				    	'\nCookie sent: ' + cookie +
-				    	'\nCookie received: ' + finalCookie +
-				    	'\n==============================\n\n\n');
-
-			return Parse.Promise.as(finalCookie);
-		});
-	}, function(error) {
-		return Parse.Error(error);
-	});
 }
 
 

@@ -25,9 +25,18 @@ exports.indexOfMatchInParseArrayForObjectOnField = function(array, object, field
 // If the object provided matches at least one element in the array provided on the
 // field provided, true will be returned. If there are no matches then false is
 // returned.
-function arrayOfParseObjectsContainsObjectForField(array, object, field) {
+exports.arrayOfParseObjectsContainsObjectForField = function(array, object, field) {
 	for (var i = 0; i < array.length; i++) {
 		if (array[i].get(field) == object.get(field)) return true;
 	}
 	return false;
+}
+
+
+exports.matchingElementsInArrayForObjectRefOnField = function(array, object, field) {
+	var matchingElements = [];
+	for (var i = 0; i < array.length; i++) {
+		if (array[i].get(field).id == object.id) matchingElements.push(array[i]);
+	}
+	return matchingElements;
 }
