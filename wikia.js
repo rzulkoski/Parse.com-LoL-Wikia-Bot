@@ -1,5 +1,23 @@
 var credentials = require('cloud/wikia_credentials.js');
 
+// Returns an array of page objects with 'title' and 'text' as the members for each object.
+// NOTE: This function was constructed with the help of 'BryghtShadow' (http://leagueoflegends.wikia.com/wiki/User:BryghtShadow)
+exports.parsePagesFromExportText = function(exportText) {
+	var pagePattern = /<page>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<text xml\:space=\\"preserve\\" bytes=\\"\d+\\">([\s\S]*?)<\/page>/g
+	var pages = [];
+
+	var matchArray;
+	while ((matchArray = pagePattern.exec(exportText)) !== null) {
+		var page = new Object();
+		page.title = matchArray[1];
+		page.text = matchArray[2];
+		pages.push(page);
+	}
+
+	return pages;
+}
+
+
 // Returns a cookie after successful login
 exports.login = function() {
 	console.log('Login: ' + credentials.loginName() + ', Password: ' + credentials.password());
@@ -11,7 +29,7 @@ exports.login = function() {
 	var cookiePrefix;
 
 	return Parse.Cloud.httpRequest({ method: "POST", url: wikiaURL }).then(function(httpResponse) {
-		console.log(httpResponse.text);
+		//console.log(httpResponse.text);
 		json = JSON.parse(httpResponse.text);
 
 		cookiePrefix = json.login.cookieprefix;
@@ -26,17 +44,17 @@ exports.login = function() {
 		confirmToken = cookiePrefix + '_session=' + sessionID;
 
 		for (var header in httpResponse.headers) {
-			console.log('Headers: ' + header + ': ' + httpResponse.headers[header]);
+			//console.log('Headers: ' + header + ': ' + httpResponse.headers[header]);
 		}
 
-		console.log('\n\n' +
+		/*console.log('\n\n' +
 					'\n==============================' +
 					'\nInitial login response: ' + result +
 					'\nCookie prefix: ' + cookiePrefix +
 				    '\nCookie Received: ' + cookie +
 				    '\nSessionID: ' + sessionID +
 				    '\nLogin token: ' + loginToken +
-				    '\n==============================\n\n');
+				    '\n==============================\n\n');*/
 
 		return Parse.Promise.as(loginToken);
 	}).then(function(loginToken) {
@@ -44,12 +62,12 @@ exports.login = function() {
 			var json = JSON.parse(loginResponse.text);
 			var finalCookie = loginResponse.headers['Set-Cookie'];
 			var result = json.login.result;
-			console.log('\n' +
+			/*console.log('\n' +
 						'\n==============================' +
 						'\nFinal login response: ' + result +
 				    	'\nCookie sent: ' + cookie +
 				    	'\nCookie received: ' + finalCookie +
-				    	'\n==============================\n\n\n');
+				    	'\n==============================\n\n\n');*/
 
 			return Parse.Promise.as(finalCookie);
 		});
