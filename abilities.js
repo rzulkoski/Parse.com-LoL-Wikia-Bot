@@ -70,9 +70,8 @@ function parseAbilitiesDataStringForChampionWithExistingAbilities(abilitiesDataS
 	var statsToParse = getArrayOfStatsToUpdate();
 	var abilitiesToSave = [];
 
-	console.log(abilitiesDataString);
+	//console.log(abilitiesDataString);
 	var individualAbilityDataStrings = separateAbilitiesDataStringIntoIndividualAbilityDataStrings(abilitiesDataString);
-	//if (champion.get('name') == 'Aatrox') console.log('length of abilityStrings array' + individualAbilityDataStrings.length);
 
 	for (var i=0; i<individualAbilityDataStrings.length; i++) {
 		var ability;
@@ -86,24 +85,14 @@ function parseAbilitiesDataStringForChampionWithExistingAbilities(abilitiesDataS
 		} else ability = existingAbilities[indexOfMatch];
 
 		ability.set('champion', champion);
-		//if (champion.get('name') == 'Aatrox') console.log(ability.get('champion'));
 		ability.set('binding', bindingPattern.exec(individualAbilityDataStrings[i])[1]);
 		ability.set('rawData', individualAbilityDataStrings[i]);
 
 		var hasChanged = false;
-
-		//if (champion.get('name') == 'Aatrox') {
-			for (var j=0; j<2; j++) {
-				//console.log('j: ' + j + ', stat: ' + statsToParse[j]);
-				hasChanged = setStatUsingDataStringAndAbility(statsToParse[j], individualAbilityDataStrings[i], ability);
-			}
-		//}
-
-		/*for (var statIndex=0; statIndex<statsToParse.length; statIndex++) {
-			if (champion.get('name') == 'Aatrox') console.log('about to call setStats');
+		for (var statIndex=0; statIndex<statsToParse.length; statIndex++) {
 			hasChanged = setStatUsingDataStringAndAbility(statsToParse[statIndex], individualAbilityDataStrings[i], ability);
-			//if (abilityShouldBeSaved == false && hasChanged == true) abilityShouldBeSaved = true;
-		}*/
+			if (abilityShouldBeSaved == false && hasChanged == true) abilityShouldBeSaved = true;
+		}
 
 		if (abilityShouldBeSaved) abilitiesToSave.push(ability);
 	}
@@ -134,7 +123,6 @@ function abilityDataStringHoldsMultipleAbilities(dataString) {
 }
 
 function setStatUsingDataStringAndAbility(stat, dataString, ability) {
-	//if (ability.get('champion').id == 'WWzCjMvxze') console.log('at beginning of setStat');
 	var newValue;
 	var matchArray;
 	var pattern;
@@ -145,17 +133,17 @@ function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 			pattern = /\|name *\= *([^\\]*?)\\n/g
 			break;
 		case 'imageName':
-			pattern = /\|icon *\= *([^\\]+)\\n/g
+			pattern = /\|icon *\= *([^\\]*?)\\n/g
 			break;
 		case 'description':
-			pattern = /\|description[\s]+\=[\s\\n]+(?:\{+sbc\|[\w\:]+\}+ )*([^\?]+)(?:\|leveling)*/
+			pattern = /\|description[\d ]*= *([\s\S]*?)(?=\}\}\\n|\|description|\|leveling|\|cooldown)/g
 			break;
 	}
 
 	var matches = 0;
 	while((matchArray = pattern.exec(dataString)) !== null) {
 		matches++;
-
+		if (ability.get('champion').id == 'WWzCjMvxze' && stat == 'description') console.log('LastIndex: ' + pattern.lastIndex + ', Desc: ' + matchArray[1]);
 		var oldValue = ability.get((matches == 1 ? stat : stat + matches));
 
 		switch (stat) {
@@ -185,7 +173,7 @@ function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 }
 
 function getArrayOfStatsToUpdate() {
-	var statsToUpdate = ['name','imageName'];// 'description'];
+	var statsToUpdate = ['name','imageName','description'];
 
 	return statsToUpdate;
 }
