@@ -40,3 +40,14 @@ exports.matchingElementsInArrayForObjectRefOnField = function(array, object, fie
 	}
 	return matchingElements;
 }
+
+exports.indexOfMatchInParseArrayOnID = function(array, id) {
+	var indexOfMatch = -1;
+	for (var i=0; i < array.length; i++) {
+		if (array[i].id == id) {
+			indexOfMatch = i;
+			break;
+		}
+	}
+	return indexOfMatch;
+}

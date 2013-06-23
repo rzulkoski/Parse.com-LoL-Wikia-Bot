@@ -2,6 +2,8 @@
 
 require('cloud/champions.js');
 require('cloud/abilities.js');
+require('cloud/trivia.js');
+var toolbox = require('cloud/parse_toolbox.js');
 
 Parse.Cloud.define('updateAll', function(request, response) {
 	Parse.Cloud.run('updateChampions').then(function() {
@@ -26,3 +28,4 @@ Parse.Cloud.define('test', function(request, response) {
 }, function(error) {
 	response.error('Error!');
 });
+

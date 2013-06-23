@@ -30,7 +30,7 @@ Parse.Cloud.define('updateAbilities', function(request, response) {
 
 // DESCRIPTION
 function fetchAndUpdateAbilitiesFromWikiaForChampionsAndAbilities(champions, abilities) {
-	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&prop=revisions&rvprop=content&generator=categorymembers&gcmtitle=Category:Released_champion&gcmlimit=max&export';
+	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&generator=categorymembers&gcmtitle=Category:Released_champion&gcmlimit=max&export';
 	console.log('URL for ability fetch: ' + wikiaURL);
 
 	return Parse.Cloud.httpRequest({ url: wikiaURL }).then(function(httpResponse) {
