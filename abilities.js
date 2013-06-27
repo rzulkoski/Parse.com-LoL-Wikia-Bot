@@ -28,7 +28,9 @@ Parse.Cloud.define('updateAbilities', function(request, response) {
 
 
 
-// DESCRIPTION
+// Takes in the existing sets of champions and abilities, fetches data from wikia and then compares the existing
+// data to the fetched data. It will then save existing abilities if there are any changes as well as brand new
+// abilities. This function returns the number of abilities that were saved.
 function fetchAndUpdateAbilitiesFromWikiaForChampionsAndAbilities(champions, abilities) {
 	var wikiaURL = 'http://leagueoflegends.wikia.com/api.php?action=query&format=json&generator=categorymembers&gcmtitle=Category:Released_champion&gcmlimit=max&export';
 	console.log('URL for ability fetch: ' + wikiaURL);
@@ -39,14 +41,12 @@ function fetchAndUpdateAbilitiesFromWikiaForChampionsAndAbilities(champions, abi
 		var abilitiesToSave = [];
 
 		for (var i=0; i<pages.length; i++) {
-			var abilitiesDataString = /== *Abilities *==([\s\S]*?)== *References *==/.exec(pages[i].text)[1];
+			var abilitiesDataString = /== *Abilities *==([\s\S]*?)== *(?:Notes|References) *==/.exec(pages[i].text)[1];
 			var champNameFromPage = pages[i].title;
 			var champIndex = toolbox.indexOfMatchInParseArrayForStringOnField(champions, champNameFromPage, 'name');
 			var existingAbilitiesForChampion = toolbox.matchingElementsInArrayForObjectRefOnField(abilities, champions[champIndex], 'champion');
 
-			if (i<114) {
-				abilitiesToSave = abilitiesToSave.concat(parseAbilitiesDataStringForChampionWithExistingAbilities(abilitiesDataString, champions[champIndex], existingAbilitiesForChampion));
-			}
+			abilitiesToSave = abilitiesToSave.concat(parseAbilitiesDataStringForChampionWithExistingAbilities(abilitiesDataString, champions[champIndex], existingAbilitiesForChampion));
 		}
 
 		console.log('aboutToSave');
@@ -118,10 +118,6 @@ function separateAbilitiesDataStringIntoIndividualAbilityDataStrings(dataString)
 	return individualAbilityDataStrings;
 }
 
-function abilityDataStringHoldsMultipleAbilities(dataString) {
-	return /[Aa]bility[\s]+info/.test(dataString);
-}
-
 function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 	var newValue;
 	var matchArray;
@@ -138,6 +134,8 @@ function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 		case 'description':
 			pattern = /\|description[\d ]*= *([\s\S]*?)(?=\}\}\\n|\|description|\|leveling|\|cooldown)/g
 			break;
+		case 'leveling':
+			pattern = /\|leveling *= *([\s\S]*?)\\n\|/g
 	}
 
 	var matches = 0;
@@ -156,6 +154,7 @@ function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 			case 'name':
 			case 'imageName':
 			case 'description':
+			case 'leveling':
 				newValue = matchArray[1];
 				break;
 			case 'releaseDate': // Placeholder
@@ -173,7 +172,7 @@ function setStatUsingDataStringAndAbility(stat, dataString, ability) {
 }
 
 function getArrayOfStatsToUpdate() {
-	var statsToUpdate = ['name','imageName','description'];
+	var statsToUpdate = ['name','imageName']; //,'description','leveling'];
 
 	return statsToUpdate;
 }

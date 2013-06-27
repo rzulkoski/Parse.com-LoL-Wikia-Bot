@@ -15,7 +15,10 @@ Parse.Cloud.define('getTriviaQuestion', function (request, response) {
 	championsQuery.limit(200);
 	abilitiesQuery.limit(1000);
 
+	console.log('About to fetch abilities/champions');
+
 	Parse.Promise.when([abilitiesQuery.find(), championsQuery.find()]).then(function(abilities, champions) {
+		console.log('Fetch complete!');
 		var choices = [];
 		var questionIndex = Math.floor(Math.random() * (abilities.length+1));
 		var questionChampID = abilities[questionIndex].get('champion').id;

@@ -2,6 +2,7 @@
 
 require('cloud/champions.js');
 require('cloud/abilities.js');
+require('cloud/items.js');
 require('cloud/trivia.js');
 var toolbox = require('cloud/parse_toolbox.js');
 
